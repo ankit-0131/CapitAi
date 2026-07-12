@@ -104,9 +104,9 @@ CapitAI resolves the problem of high-friction financial analysis by pairing a co
    npm install
    ```
 
-### Environment Setup
+### Environment Setup & API Configuration
 
-Create a `.env` file in the `server` directory:
+To enable live LLM integration, create a `.env` file in the `server` directory:
 ```bash
 # server/.env
 PORT=5000
@@ -119,6 +119,12 @@ Create a `.env` file in the `client` directory to point to the backend in produc
 # client/.env
 VITE_API_URL=http://localhost:5000
 ```
+
+#### API Files & Model Integration Locations:
+* **Gemini LLM Chat Flow & Profile Updates:** Configured in `server/src/server.js` (using `@langchain/google-genai`).
+* **OpenAI Fallback Chat Flow:** Configured in `server/src/server.js` (using `@langchain/openai`).
+* **Dynamic RAG Context Similarity Search:** Integrated in `server/src/lib/ai/retriever.js` (using `GoogleGenerativeAIEmbeddings`).
+* **Agentic Tool Definitions:** Coded in `server/src/tools/coreTools.js` (stress tests, financials, backtests).
 
 ### Running Locally
 
@@ -193,6 +199,15 @@ Post request payload to `/api/simulate`:
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+## AI Assistance & Acknowledgments
+
+This project was built and refactored with the assistance of **Antigravity**, a powerful agentic AI coding companion designed by Google DeepMind. AI support was key in:
+* Integrating the LangChain.js agentic loop, vector retrievers, and tool calling features.
+* Implementing the dynamic, fuzzy ticker search parsing in the chatbot query router.
+* Mapping and refining the light/dark mode CSS tokens and layout components from the Stitch design system.
 
 ---
 
