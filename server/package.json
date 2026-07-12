@@ -11,16 +11,19 @@
   },
   "dependencies": {
     "@langchain/core": "^0.3.0",
+    "@langchain/google-genai": "^0.2.18",
     "@langchain/langgraph": "^0.2.0",
+    "@langchain/openai": "^0.3.17",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "langchain": "^0.3.37",
+    "nodemailer": "^6.9.13",
     "pg": "^8.12.0",
     "redis": "^4.6.15",
     "socket.io": "^4.7.5",
     "sqlite3": "^5.1.7",
-    "zod": "^3.23.8",
-    "nodemailer": "^6.9.13"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

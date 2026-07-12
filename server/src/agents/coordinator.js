@@ -1,7 +1,15 @@
 import { getLiveStockQuote } from '../tools/apiClients.js';
-import { getStockPriceTool, getHistoricalPerformanceTool, getCompanyFinancialsTool } from '../tools/financials.js';
-import { getCompanyNewsTool, getMarketSentimentTool, getCompetitorsTool, getStartupFundingTool } from '../tools/news.js';
-import { getMacroeconomicIndicatorsTool, getSectorPerformanceTool } from '../tools/macro.js';
+import { 
+  getStockPriceTool, 
+  getHistoricalPerformanceTool, 
+  getCompanyFinancialsTool, 
+  getCompanyNewsTool, 
+  getMarketSentimentTool, 
+  getCompetitorsTool, 
+  getStartupFundingTool, 
+  getMacroeconomicIndicatorsTool, 
+  getSectorPerformanceTool 
+} from '../tools/coreTools.js';
 import { calculateFinancialHealthTool, calculateGrowthPotentialTool, calculateValuationTool, calculateRiskScoreTool, calculateConfidenceScoreTool, generateRecommendationTool } from '../tools/calculators.js';
 
 // Setup agent names matching user specification

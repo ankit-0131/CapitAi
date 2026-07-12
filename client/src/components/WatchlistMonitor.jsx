@@ -17,10 +17,10 @@ export default function WatchlistMonitor({ watchlist, userId, currency, refreshW
   const [quotes, setQuotes] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Currency converter (1 USD = 83 INR)
+  // Currency converter (1 USD = 95 INR)
   const formatPrice = (val) => {
     if (currency === 'INR') {
-      return `₹${(val * 83).toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
+      return `₹${(val * 95).toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
     }
     return `$${val.toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
   };

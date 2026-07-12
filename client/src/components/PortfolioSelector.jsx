@@ -26,7 +26,7 @@ export default function PortfolioSelector({ portfolio, userId, currency, refresh
 
   // Currency Converter Formatting
   const formatVal = (val) => {
-    const rate = currency === 'INR' ? 83 : 1;
+    const rate = currency === 'INR' ? 95 : 1;
     const symbol = currency === 'INR' ? '₹' : '$';
     return `${symbol}${(val * rate).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
@@ -39,7 +39,7 @@ export default function PortfolioSelector({ portfolio, userId, currency, refresh
     // Cost average input is inputted in the selected currency, so if in INR, we convert to USD for backend database consistency
     let usdPrice = parseFloat(price);
     if (currency === 'INR') {
-      usdPrice = usdPrice / 83;
+      usdPrice = usdPrice / 95;
     }
 
     try {
