@@ -151,11 +151,37 @@ export default function Dashboard({ report, ticker, loading, preferences, watchl
   };
 
   const verdictStyles = {
-    'Strong Buy': { css: 'text-emerald-400 border-emerald-500/20 bg-emerald-950/20', advice: 'Should I invest? YES. The company presents exceptional financial stability and growth parameters.' },
-    'Buy / Consider': { css: 'text-cyan-400 border-cyan-500/20 bg-cyan-950/20', advice: 'Should I invest? YES, CONSIDER. Highly promising profile. Consider entry on minor price consolidations.' },
-    'Avoid / High Risk': { css: 'text-red-400 border-red-500/20 bg-red-950/20', advice: 'Should I invest? NO, AVOID. Ratios indicate high debt leverage or extreme valuation premiums.' }
+    'Strong Buy': {
+      textClass: 'text-emerald-500 dark:text-emerald-400',
+      badgeClass: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+      bubbleClass: 'bg-emerald-500/10',
+      advice: 'Should I invest? YES. The company presents exceptional financial stability and growth parameters.'
+    },
+    'Buy / Consider': {
+      textClass: 'text-cyan-505 dark:text-cyan-400',
+      badgeClass: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-600 dark:text-cyan-400',
+      bubbleClass: 'bg-cyan-500/10',
+      advice: 'Should I invest? YES, CONSIDER. Highly promising profile. Consider entry on minor price consolidations.'
+    },
+    'Avoid / High Risk': {
+      textClass: 'text-red-500 dark:text-red-400',
+      badgeClass: 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400',
+      bubbleClass: 'bg-red-500/10',
+      advice: 'Should I invest? NO, AVOID. Ratios indicate high debt leverage or extreme valuation premiums.'
+    },
+    'Hold / Wait': {
+      textClass: 'text-amber-600 dark:text-amber-400',
+      badgeClass: 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400',
+      bubbleClass: 'bg-amber-500/10',
+      advice: 'Should I invest? Hold / Wait. Neutral outlook. Monitor quarterly statements.'
+    }
   };
-  const { css: investVerdictClass, advice: investAdviceText } = verdictStyles[recommendationGrade] || { css: 'text-amber-400 border-amber-500/20 bg-amber-950/20', advice: 'Should I invest? Hold / Wait. Neutral outlook. Monitor quarterly statements.' };
+  const currentVerdict = verdictStyles[recommendationGrade] || verdictStyles['Hold / Wait'];
+
+  const expNote = getExperienceNote();
+  const noteParts = expNote.split(': ');
+  const notePrefix = noteParts[0] ? `${noteParts[0]}:` : 'Note:';
+  const noteContent = noteParts[1] || '';
 
   return (
     <div className="space-y-6">
@@ -192,57 +218,69 @@ export default function Dashboard({ report, ticker, loading, preferences, watchl
 
       {/* Consensus & Metrics Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className={`glass-panel border p-6 flex flex-col justify-between ${investVerdictClass}`}>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Consensus Verdict</div>
-            <div className="text-2xl font-black tracking-tight mt-1.5">{recommendationGrade}</div>
-            <p className="text-xs font-medium leading-relaxed mt-3 opacity-90">{investAdviceText}</p>
-            <p className="text-[10px] font-bold mt-2.5 opacity-80 leading-normal border-t border-white/10 pt-2">{getExperienceNote()}</p>
+        <div className="bg-surface border border-outline-variant/30 rounded-xl p-6 lg:p-8 shadow-sm flex flex-col justify-between relative overflow-hidden group min-h-[320px]">
+          {/* Decorative subtle gradient */}
+          <div className={`absolute -right-20 -top-20 w-48 h-48 rounded-full blur-3xl group-hover:opacity-100 opacity-60 transition-all duration-500 pointer-events-none ${currentVerdict.bubbleClass}`} />
+          
+          <div className="relative z-10">
+            <div className="text-[10px] text-slate-400 uppercase tracking-[0.15em] font-bold mb-4">Consensus Verdict</div>
+            <h2 className={`font-headline-md text-2xl font-black mb-4 ${currentVerdict.textClass}`}>{recommendationGrade}</h2>
+            <p className="text-xs font-medium leading-relaxed text-on-surface-variant mb-6">{currentVerdict.advice}</p>
+            
+            <div className={`border rounded p-4 mb-6 ${currentVerdict.badgeClass}`}>
+              <p className="text-xs font-semibold leading-normal">
+                <span className="font-bold mr-1">{notePrefix}</span>
+                {noteContent}
+              </p>
+            </div>
           </div>
-          <div className="pt-4 border-t border-white/5 mt-4 text-[10px] opacity-60 font-semibold">
+          
+          <div className="text-[10px] text-slate-400 pt-4 border-t border-outline-variant/20 relative z-10">
             Tailored to your {convertShortValue(parseInt(preferences.investmentAmount))} capital at {preferences.investmentHorizon} horizon.
           </div>
         </div>
 
-        <div className="glass-panel p-6 lg:col-span-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Core Model Ratios (Hover for Definitions)</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: 'P/E Ratio', value: quote?.pe, subtitle: 'Sector Avg: ~28x', tTitle: 'Price-to-Earnings Ratio', tDesc: 'Measures how expensive a stock is compared to its actual profit. Lower numbers generally indicate better value.', valColor: 'text-white' },
-              { label: 'P/B Ratio', value: quote?.pb, subtitle: 'Sector Avg: ~4.2x', tTitle: 'Price-to-Book Ratio', tDesc: "Compares the stock price to the company's net assets. Numbers below 3 are often considered reasonable.", valColor: 'text-white' },
-              { label: 'ROE Index', value: quote?.roe ? `${(quote.roe * 100).toFixed(1)}%` : 'N/A', subtitle: 'Capital Return', tTitle: 'Return on Equity', tDesc: 'Measures how efficiently the company turns invested capital into profit. Values above 15% are excellent.', valColor: 'text-emerald-400' },
-              { label: 'Debt / Equity', value: quote?.debtEq, subtitle: 'Leverage Index', tTitle: 'Debt to Equity Ratio', tDesc: "Compares company debt to owned equity. Lower values (below 0.8) are safer and indicate less risk.", valColor: 'text-amber-400', isRight: true }
-            ].map(({ label, value, subtitle, tTitle, tDesc, valColor, isRight }, idx) => (
-              <div key={idx} className="bg-slate-950/40 p-3.5 rounded-lg border border-slate-900/60 relative group cursor-help">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">{label}</span>
-                  <HelpCircle className="h-3 w-3 text-slate-600" />
+        <div className="bg-surface border border-outline-variant/30 rounded-xl p-6 lg:p-8 shadow-sm flex flex-col justify-between lg:col-span-2">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-6">Core Model Ratios (Hover for Definitions)</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: 'P/E Ratio', value: quote?.pe, subtitle: 'Sector Avg: ~28x', tTitle: 'Price-to-Earnings Ratio', tDesc: 'Measures how expensive a stock is compared to its actual profit. Lower numbers generally indicate better value.', valColor: 'text-on-surface' },
+                { label: 'P/B Ratio', value: quote?.pb, subtitle: 'Sector Avg: ~4.2x', tTitle: 'Price-to-Book Ratio', tDesc: "Compares the stock price to the company's net assets. Numbers below 3 are often considered reasonable.", valColor: 'text-on-surface' },
+                { label: 'ROE Index', value: quote?.roe ? `${(quote.roe * 100).toFixed(1)}%` : 'N/A', subtitle: 'Capital Return', tTitle: 'Return on Equity', tDesc: 'Measures how efficiently the company turns invested capital into profit. Values above 15% are excellent.', valColor: 'text-emerald-500' },
+                { label: 'Debt / Equity', value: quote?.debtEq, subtitle: 'Leverage Index', tTitle: 'Debt to Equity Ratio', tDesc: "Compares company debt to owned equity. Lower values (below 0.8) are safer and indicate less risk.", valColor: 'text-amber-500', isRight: true }
+              ].map(({ label, value, subtitle, tTitle, tDesc, valColor, isRight }, idx) => (
+                <div key={idx} className="bg-slate-950/40 p-3.5 rounded-lg border border-slate-900/10 relative group cursor-help transition-all hover:shadow-[0_4px_20px_-4px_rgba(74,124,122,0.1)]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">{label}</span>
+                    <HelpCircle className="h-3 w-3 text-slate-600" />
+                  </div>
+                  <span className={`text-lg font-mono font-black ${valColor} block mt-1`}>{value || 'N/A'}</span>
+                  <span className="text-[9px] text-slate-400">{subtitle}</span>
+                  <div className={`absolute ${isRight ? 'right-0' : 'left-0'} bottom-full mb-2 w-52 p-3 bg-slate-950 border border-slate-800 rounded-lg text-[10px] text-slate-300 leading-normal hidden group-hover:block z-50 shadow-2xl`}>
+                    <span className="font-bold text-white block mb-1">{tTitle}</span>
+                    {tDesc}
+                  </div>
                 </div>
-                <span className={`text-lg font-mono font-black ${valColor} block mt-1`}>{value || 'N/A'}</span>
-                <span className="text-[9px] text-slate-400">{subtitle}</span>
-                <div className={`absolute ${isRight ? 'right-0' : 'left-0'} bottom-full mb-2 w-52 p-3 bg-slate-950 border border-slate-800 rounded-lg text-[10px] text-slate-300 leading-normal hidden group-hover:block z-50 shadow-2xl`}>
-                  <span className="font-bold text-white block mb-1">{tTitle}</span>
-                  {tDesc}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-900/60 space-y-2">
+          <div className="mt-4 pt-4 border-t border-outline-variant/20 space-y-2">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Metrics that Influenced this Verdict</span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               {[
                 { label: 'Financial Health (25% weight)', score: scoreBreakdown?.financialHealth, color: 'bg-emerald-500' },
-                { label: 'Growth Potential (20% weight)', score: scoreBreakdown?.growthPotential, color: 'bg-cyan-500' },
-                { label: 'Valuation Multiples (10% weight)', score: scoreBreakdown?.valuation, color: 'bg-purple-500' },
-                { label: 'Risk Factor (5% weight)', score: scoreBreakdown?.riskRating, color: 'bg-amber-500' }
+                { label: 'Growth Potential (20% weight)', score: scoreBreakdown?.growthPotential, color: 'bg-emerald-400' },
+                { label: 'Valuation Multiples (10% weight)', score: scoreBreakdown?.valuation, color: 'bg-slate-400' },
+                { label: 'Risk Factor (5% weight)', score: scoreBreakdown?.riskRating, color: 'bg-amber-400' }
               ].map(({ label, score, color }, idx) => (
                 <div key={idx} className="space-y-1">
                   <div className="flex justify-between text-[10px]">
                     <span className="text-slate-400">{label}</span>
                     <span className="text-white font-bold">{score}/10</span>
                   </div>
-                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-900/40 h-1.5 rounded-full overflow-hidden">
                     <div className={`${color} h-full rounded-full`} style={{ width: `${(score || 5) * 10}%` }} />
                   </div>
                 </div>

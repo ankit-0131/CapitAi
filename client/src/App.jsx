@@ -90,7 +90,7 @@ export default function App() {
 
   // Global settings
   const [currency, setCurrency] = useState('USD');
-  const [theme, setTheme] = useState(() => localStorage.getItem('capitai_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('capitai_theme') || 'light');
   const [ticker, setTicker] = useState('TSLA');
   const [searchTicker, setSearchTicker] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -760,7 +760,7 @@ export default function App() {
 
   return (
     <div className={`h-screen overflow-hidden bg-[#05070f] text-slate-200 flex flex-col antialiased ${theme === 'light' ? 'light' : ''}`}>
-      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur sticky top-0 z-40 px-6 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+      <header className="border-b border-slate-900/20 bg-slate-950/80 backdrop-blur sticky top-0 z-40 px-6 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
         <div className="flex items-center justify-between w-full lg:w-auto">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -881,7 +881,7 @@ export default function App() {
       </header>
 
       <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
-        <nav className={`w-full ${isSidebarCollapsed ? 'md:w-16 md:px-2' : 'md:w-64 md:p-4'} border-b md:border-b-0 md:border-r border-slate-900 bg-slate-950/40 p-4 flex md:flex-col overflow-x-auto md:overflow-x-visible shrink-0 gap-1.5 scrollbar-none transition-all duration-300`}>
+        <nav className={`w-full ${isSidebarCollapsed ? 'md:w-16 md:px-2' : 'md:w-64 md:p-4'} border-b md:border-b-0 md:border-r border-slate-900/20 bg-slate-950/40 p-4 flex md:flex-col overflow-x-auto md:overflow-x-visible shrink-0 gap-1.5 scrollbar-none transition-all duration-300`}>
           <p className={`text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2 transition-all duration-300 ${isSidebarCollapsed ? 'md:hidden opacity-0 h-0 mb-0 overflow-hidden' : 'md:block opacity-100'}`}>
             Investment Intelligence
           </p>
@@ -889,7 +889,7 @@ export default function App() {
             <button 
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-3 py-2 text-xs font-semibold rounded-lg transition-all duration-300 whitespace-nowrap ${activeTab === id ? 'bg-emerald-500/10 text-emerald-400 border-l-0 md:border-l-2 border-b-2 md:border-b-0 border-emerald-500' : 'text-slate-400 hover:bg-slate-900 hover:text-white'} ${isSidebarCollapsed ? 'md:justify-center md:px-0' : 'px-3'}`}
+              className={`flex items-center gap-3 py-2.5 text-xs font-semibold rounded-lg transition-all duration-300 whitespace-nowrap hover:translate-x-1 duration-200 ${activeTab === id ? 'bg-emerald-500/10 text-emerald-500 border-l-0 md:border-l-4 border-b-2 md:border-b-0 border-emerald-500' : 'text-slate-400 hover:bg-slate-900/40 hover:text-white border-l-0 md:border-l-4 border-b-2 md:border-b-0 border-transparent'} ${isSidebarCollapsed ? 'md:justify-center md:px-0' : 'px-3'}`}
               title={isSidebarCollapsed ? label : ''}
             >
               <Icon className="h-4 w-4 shrink-0" />

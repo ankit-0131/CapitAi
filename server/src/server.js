@@ -301,7 +301,39 @@ app.post('/api/chat', wrap(async (req, res) => {
   }
 
   const start = Date.now();
-  const activeTick = activeTicker || ticker;
+  // Dynamic Ticker Detection based on user query
+  let detectedTicker = null;
+  const msgLower = lastUserMessage.toLowerCase();
+  
+  if (msgLower.includes("reliance") || msgLower.includes("relience")) {
+    detectedTicker = "RELIANCE.NS";
+  } else if (msgLower.includes("tesla") || msgLower.includes("tsla")) {
+    detectedTicker = "TSLA";
+  } else if (msgLower.includes("apple") || msgLower.includes("aapl")) {
+    detectedTicker = "AAPL";
+  } else if (msgLower.includes("microsoft") || msgLower.includes("msft")) {
+    detectedTicker = "MSFT";
+  } else if (msgLower.includes("google") || msgLower.includes("alphabet") || msgLower.includes("goog")) {
+    detectedTicker = "GOOGL";
+  } else if (msgLower.includes("nvidia") || msgLower.includes("nvda")) {
+    detectedTicker = "NVDA";
+  } else if (msgLower.includes("tcs") || msgLower.includes("tata consultancy")) {
+    detectedTicker = "TCS.NS";
+  } else if (msgLower.includes("infosys") || msgLower.includes("infy")) {
+    detectedTicker = "INFY.NS";
+  } else if (msgLower.includes("hdfc")) {
+    detectedTicker = "HDFCBANK.NS";
+  } else if (msgLower.includes("paytm")) {
+    detectedTicker = "PAYTM.NS";
+  } else {
+    // Try to extract any uppercase symbol matching standard ticker patterns
+    const uppercaseWords = lastUserMessage.match(/\b([A-Z]{2,6})(?:\.[A-Z]{2})?\b/);
+    if (uppercaseWords) {
+      detectedTicker = uppercaseWords[0];
+    }
+  }
+
+  const activeTick = detectedTicker || activeTicker || ticker || "TSLA";
 
   // 1. Gather context
   let preferences = (userId ? await getUserMemory(userId) : null) || {
