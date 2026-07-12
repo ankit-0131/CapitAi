@@ -1,6 +1,5 @@
 # CapitAI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-purple.svg)](https://vite.dev/)
@@ -202,3 +201,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 Ankit - [@ankit-0131](https://github.com/ankit-0131)
 
 Project Link: [https://github.com/ankit-0131/CapitAi](https://github.com/ankit-0131/CapitAi)
+
+Deployed Link: [Link](https://vercel.com/freelancer18/captai/EzoXcfVP9mDC1ZC9gp2hnFETo5hu)
+
