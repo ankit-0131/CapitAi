@@ -36,7 +36,7 @@ import DebateMode from './components/DebateMode';
 import ObservabilityView from './components/ObservabilityView';
 import ChatbotWidget from './components/ChatbotWidget';
 
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const STOCK_PRESETS = [
   { symbol: 'TSLA', name: 'Tesla, Inc.' },
