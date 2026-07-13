@@ -40,8 +40,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+// On Vercel, skip HTTP server and socket.io (serverless environment)
+const IS_VERCEL = !!process.env.VERCEL;
+let httpServer = null;
+// Provide a no-op io so coordinator.js doesn't crash (io usage is already guarded with `if (io)`)
+const io = IS_VERCEL
+  ? { emit: () => {}, on: () => {} }
+  : new Server(createServer(app), { cors: { origin: '*', methods: ['GET', 'POST'] } });
+if (!IS_VERCEL) {
+  httpServer = createServer(app);
+}
 
 // Observability Middleware
 app.use(async (req, res, next) => {
@@ -648,19 +656,31 @@ Please ask me a financial query, specify a stock ticker (e.g. TSLA, AAPL), or as
   });
 }));
 
-// Boot servers
+// Boot servers (only in non-Vercel / local environments)
 async function startServer() {
   await initDb();
   await initCache();
-  io.on('connection', (socket) => {
+  const server = createServer(app);
+  const liveIo = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+  liveIo.on('connection', (socket) => {
     console.log(`Socket client connected: ${socket.id}`);
     socket.on('disconnect', () => console.log(`Socket client disconnected: ${socket.id}`));
   });
-  httpServer.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`========================================`);
     console.log(` CapitAI Backend is running on port ${PORT}`);
     console.log(`========================================`);
   });
 }
 
-startServer().catch(err => console.error('Fatal boot error:', err.message));
+// On Vercel, initialize DB/cache once when the module is first imported.
+// On local, run the full HTTP server.
+if (IS_VERCEL) {
+  // Fire-and-forget DB + cache init for serverless cold start
+  initDb().then(() => initCache()).catch(err => console.error('Vercel init error:', err.message));
+} else {
+  startServer().catch(err => console.error('Fatal boot error:', err.message));
+}
+
+// Export app for Vercel serverless handler
+export default app;

@@ -20,3 +20,9 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# SQLite database (local only — Vercel uses /tmp, production uses PostgreSQL)
+server/data/
+
+# Task tracking (agent scratch file)
+task.md

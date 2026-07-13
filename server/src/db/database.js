@@ -8,11 +8,18 @@ import crypto from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_DIR = path.join(__dirname, '../../data');
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+// On Vercel, only /tmp is writable. Use it for SQLite unless a DATABASE_URL (PostgreSQL) is provided.
+const IS_VERCEL = !!process.env.VERCEL;
+let SQLITE_PATH;
+if (IS_VERCEL) {
+  SQLITE_PATH = '/tmp/capitai.db';
+} else {
+  const DB_DIR = path.join(__dirname, '../../data');
+  if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+  }
+  SQLITE_PATH = path.join(DB_DIR, 'capitai.db');
 }
-const SQLITE_PATH = path.join(DB_DIR, 'capitai.db');
 
 let pgPool = null;
 let sqliteDb = null;

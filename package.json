@@ -1,0 +1,27 @@
+{
+  "name": "capitai",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CapitAI - AI-powered Investment Intelligence Platform",
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "install:all": "cd server && npm install && cd ../client && npm install"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.0",
+    "@langchain/google-genai": "^0.2.18",
+    "@langchain/langgraph": "^0.2.0",
+    "@langchain/openai": "^0.3.17",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "langchain": "^0.3.37",
+    "nodemailer": "^6.9.13",
+    "pg": "^8.12.0",
+    "redis": "^4.6.15",
+    "socket.io": "^4.7.5",
+    "sqlite3": "^5.1.7",
+    "zod": "^3.23.8"
+  }
+}
