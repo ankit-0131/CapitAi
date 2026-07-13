@@ -217,5 +217,5 @@ Ankit - [@ankit-0131](https://github.com/ankit-0131)
 
 Project Link: [https://github.com/ankit-0131/CapitAi](https://github.com/ankit-0131/CapitAi)
 
-Deployed Link: [Link](https://captai-ten.vercel.app/)
+Deployed Link: [Link](https://capit-ai.vercel.app/)
 
