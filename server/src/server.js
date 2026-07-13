@@ -450,9 +450,9 @@ The user has the following investment profile:
 ${ragContext ? `Real-Time Context:\n${ragContext}` : ""}
 
 CRITICAL ADVISORY RULES:
-1. STRICTLY FOCUS ON FINANCIAL PLANNING, STOCK METRICS, PORTFOLIO ALLOCATION, AND INVESTMENT TOPICS. Politely but firmly decline to answer any non-financial queries.
+1. You can answer general queries of any type (general knowledge, discussion, coding, etc.). When asked financial or investment planning questions, act as a premium, intelligent financial advisor.
 2. ANSWER THE USER'S QUESTION DIRECTLY. Do not use generic boilerplate or introductory text.
-3. Maintain an objective, professional, and advisory tone. Avoid hype or direct buy/sell mandates.
+3. Maintain an objective, professional, and helpful tone.
 4. Reference their specific onboarding preferences and portfolio holdings where relevant.
 ${reevalPrompt}`;
 
@@ -610,24 +610,47 @@ Retrieved latest financials for **${parsed.name} (${parsed.ticker})**:
 - **Geographic Coverage**: ${parsed.geo}`;
     }
     else {
-      if (ragContext) {
-        responseText = `### Retrieved Stock Knowledge & Context
-Here is the retrieved context from my database for ticker **${activeTick.toUpperCase()}**:
-${ragContext.split("\n").slice(0, 8).join("\n")}...
+      const q = queryLower.trim();
+      if (q.includes("stock") && (q.includes("what") || q.includes("define") || q.includes("explain"))) {
+        responseText = `### 📈 Financial Education: What are Stocks?
+A **stock** (also known as equity) represents a fractional share of ownership in a company. 
 
-Based on your profile, you are a **${preferences.experience}** investor with a **${preferences.riskTolerance}** risk tolerance. Let me know if you would like me to simulate a stress test, retrieve financial details, or backtest historical returns for this stock!`;
-      } else {
-        responseText = `Hello! I am your CapitAI Personal AI Financial Advisor. 
-        
-Your onboarding profile is set to:
-- Capital Budget: $${preferences.investmentAmount}
-- Risk Tolerance: ${preferences.riskTolerance}
-- Goal: ${preferences.investmentGoal}
+When you buy a stock:
+1. **Ownership:** You own a small piece of the company's assets and earnings.
+2. **Returns:** You can earn money through **capital appreciation** (the stock price going up) or **dividends** (cash payments the company shares with investors).
+3. **Risk:** If the company performs poorly, the stock price can fall, and you could lose money.
 
-Please ask me a financial query, specify a stock ticker (e.g. TSLA, AAPL), or ask me to:
-1. **Analyze stock metrics** (retrieves live P/E, Debt/Equity, and ROE).
-2. **Execute stress test simulations** (interest rates, inflation shifts, drawdowns).
-3. **Run backtests** of historical returns.`;
+Would you like me to look up live metrics for a specific stock (e.g., TSLA, AAPL, or RELIANCE)? Just type the ticker symbol!`;
+      }
+      else if (q.includes("bond") && (q.includes("what") || q.includes("define") || q.includes("explain"))) {
+        responseText = `### 🛡️ Financial Education: What are Bonds?
+A **bond** is a debt instrument. When you buy a bond, you are essentially lending money to a government or a corporation.
+
+In return, they promise to pay you back the principal amount on a specific maturity date, plus regular interest payments (called coupon payments) along the way. Bonds are generally considered lower-risk than stocks, making them great for wealth preservation.`;
+      }
+      else if (q.includes("hello") || q.includes("hi") || q.includes("hey") || q.includes("greetings")) {
+        responseText = `Hello! I am your CapitAI Personal AI Financial Advisor. How can I help you today? Feel free to ask me general questions about finance, or specify a stock ticker like **TSLA** or **AAPL** to analyze!`;
+      }
+      else if (q.includes("help") || q.includes("what can you do")) {
+        responseText = `I can help you with:
+1. **Stock Analysis:** Type a ticker (e.g., AAPL) to see its financials.
+2. **Stress Testing:** Ask to run a "stress test" or "simulation" on a stock.
+3. **Backtesting:** Ask to "backtest" a stock to see historical performance.
+4. **General Q&A:** Ask general investment questions like "what is stocks?".`;
+      }
+      else {
+        // High-quality generic fallback that matches the query topic
+        const keywords = q.split(" ").filter(w => w.length > 3);
+        const topic = keywords.length > 0 ? keywords[0] : "investing";
+        responseText = `### 💡 CapitAI Assistant Insights
+You asked about **"${lastUserMessage}"**. 
+
+To succeed in ${topic}, it is important to:
+1. **Diversify:** Avoid putting all your capital into a single asset.
+2. **Align with Goals:** Ensure your choices match your onboarding profile (Budget: $${preferences.investmentAmount}, Risk: ${preferences.riskTolerance}).
+3. **Understand the Metrics:** Review valuation ratios (like P/E and Debt/Equity) before making commitments.
+
+Would you like me to run a scenario simulation or look up specific financials for a stock related to this?`;
       }
     }
   }

@@ -1,111 +1,111 @@
 import pg from 'pg';
-import sqlite3 from 'sqlite3';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// On Vercel, only /tmp is writable. Use it for SQLite unless a DATABASE_URL (PostgreSQL) is provided.
 const IS_VERCEL = !!process.env.VERCEL;
-let SQLITE_PATH;
-if (IS_VERCEL) {
-  SQLITE_PATH = '/tmp/capitai.db';
-} else {
-  const DB_DIR = path.join(__dirname, '../../data');
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
-  }
-  SQLITE_PATH = path.join(DB_DIR, 'capitai.db');
-}
 
+// ─── Storage backends ────────────────────────────────────────────────────────
 let pgPool = null;
 let sqliteDb = null;
 let isPg = false;
 
-// Check if PostgreSQL config is provided
-const pgConfig = {
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/capitai'
+// Pure-JS in-memory store — used on Vercel where native sqlite3 cannot compile.
+// Data lives as long as the serverless function is warm (~10 min idle).
+const mem = {
+  users:             new Map(), // userId → { id, memory }
+  user_auth:         new Map(), // username → { username, password_hash, salt, user_id, session_token }
+  sessions:          new Map(), // sessionToken → username
+  portfolio:         [],        // { id, user_id, ticker, shares, avg_price, sector, geo }
+  watchlist:         [],        // { id, user_id, ticker }
+  recommendations:   [],        // { id, user_id, ticker, score, confidence, decision, report }
+  observability:     [],        // { id, endpoint, latency, tokens, cache_hit, errors, timestamp }
+  _nextId:           1,
 };
 
+// ─── Init ─────────────────────────────────────────────────────────────────────
 export async function initDb() {
-  try {
-    // Attempt PG connection
+  if (IS_VERCEL) {
+    // Check if a real PostgreSQL URL is provided
     if (process.env.DATABASE_URL) {
-      console.log('Attempting PostgreSQL connection...');
-      pgPool = new pg.Pool(pgConfig);
-      await pgPool.query('SELECT NOW()'); // test query
+      try {
+        pgPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+        await pgPool.query('SELECT NOW()');
+        isPg = true;
+        console.log('Vercel: connected to PostgreSQL.');
+        await createTables();
+        return;
+      } catch (err) {
+        console.error('Vercel: PostgreSQL failed, falling back to in-memory store:', err.message);
+        pgPool = null;
+        isPg = false;
+      }
+    }
+    console.log('Vercel: using in-memory data store (no DATABASE_URL set).');
+    return; // in-memory store needs no initialisation
+  }
+
+  // ── Local development: use SQLite ──────────────────────────────────────────
+  try {
+    if (process.env.DATABASE_URL) {
+      pgPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+      await pgPool.query('SELECT NOW()');
       isPg = true;
-      console.log('Successfully connected to PostgreSQL database.');
+      console.log('Local: connected to PostgreSQL.');
     } else {
-      console.log('No DATABASE_URL found. Falling back to SQLite...');
       await initSqlite();
     }
   } catch (err) {
-    console.error('Failed to connect to PostgreSQL:', err.message);
-    console.log('Falling back to SQLite database...');
+    console.error('Local: PostgreSQL failed, falling back to SQLite:', err.message);
     await initSqlite();
   }
-
-  // Create tables if they do not exist
   await createTables();
 }
 
 async function initSqlite() {
+  // Dynamically import sqlite3 only when NOT on Vercel to avoid build failures
+  const sqlite3 = (await import('sqlite3')).default;
+  const fs = (await import('fs')).default;
+  const DB_DIR = path.join(__dirname, '../../data');
+  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+  const SQLITE_PATH = path.join(DB_DIR, 'capitai.db');
+
   return new Promise((resolve, reject) => {
     sqliteDb = new sqlite3.Database(SQLITE_PATH, (err) => {
-      if (err) {
-        console.error('SQLite initialization failed:', err.message);
-        reject(err);
-      } else {
-        console.log('SQLite database initialized at', SQLITE_PATH);
-        resolve();
-      }
+      if (err) { console.error('SQLite init failed:', err.message); reject(err); }
+      else { console.log('SQLite initialized at', SQLITE_PATH); resolve(); }
     });
   });
 }
 
+// ─── SQL query runner (PG / SQLite only — not used for in-memory path) ────────
 async function runQuery(sql, params = []) {
   if (isPg) {
     const res = await pgPool.query(sql, params);
     return res.rows;
-  } else {
-    return new Promise((resolve, reject) => {
-      // Convert standard parameterized syntax if needed ($1, $2) to (?)
-      let sqliteSql = sql;
-      const matches = sql.match(/\$\d+/g);
-      if (matches) {
-        // SQLite uses ? or :param. Let's map $1, $2 to ? and make sure params is an array
-        sqliteSql = sql.replace(/\$\d+/g, '?');
-      }
-
-      const method = sql.trim().toUpperCase().startsWith('SELECT') ? 'all' : 'run';
-      sqliteDb[method](sqliteSql, params, function (err, rows) {
-        if (err) {
-          reject(err);
-        } else {
-          if (method === 'run') {
-            resolve({ lastID: this.lastID, changes: this.changes });
-          } else {
-            resolve(rows);
-          }
-        }
-      });
-    });
   }
+  return new Promise((resolve, reject) => {
+    let sqliteSql = sql;
+    const matches = sql.match(/\$\d+/g);
+    if (matches) sqliteSql = sql.replace(/\$\d+/g, '?');
+    const method = sql.trim().toUpperCase().startsWith('SELECT') ? 'all' : 'run';
+    sqliteDb[method](sqliteSql, params, function (err, rows) {
+      if (err) reject(err);
+      else resolve(method === 'run' ? { lastID: this.lastID, changes: this.changes } : rows);
+    });
+  });
 }
 
 async function createTables() {
   const tables = [
-    // Users (Persistent Memory)
     `CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       memory TEXT,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
-    // User authentication (Username/Password with Sessions)
     `CREATE TABLE IF NOT EXISTS user_auth (
       username TEXT PRIMARY KEY,
       password_hash TEXT,
@@ -114,66 +114,44 @@ async function createTables() {
       user_id TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
-    // Portfolio
     `CREATE TABLE IF NOT EXISTS portfolio (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT,
-      ticker TEXT,
-      shares REAL,
-      avg_price REAL,
-      sector TEXT,
-      geo TEXT,
+      id ${isPg ? 'SERIAL' : 'INTEGER'} PRIMARY KEY ${isPg ? '' : 'AUTOINCREMENT'},
+      user_id TEXT, ticker TEXT, shares REAL, avg_price REAL,
+      sector TEXT, geo TEXT,
       purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
-    // Watchlist
     `CREATE TABLE IF NOT EXISTS watchlist (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT,
-      ticker TEXT,
+      id ${isPg ? 'SERIAL' : 'INTEGER'} PRIMARY KEY ${isPg ? '' : 'AUTOINCREMENT'},
+      user_id TEXT, ticker TEXT,
       added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(user_id, ticker)
     )`,
-    // Recommendations (AI Analysis Reports)
     `CREATE TABLE IF NOT EXISTS recommendations (
       id TEXT PRIMARY KEY,
-      user_id TEXT,
-      ticker TEXT,
-      score REAL,
-      confidence REAL,
-      decision TEXT,
-      report TEXT,
+      user_id TEXT, ticker TEXT, score REAL, confidence REAL,
+      decision TEXT, report TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
-    // Observability Logs
     `CREATE TABLE IF NOT EXISTS observability_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      endpoint TEXT,
-      latency INTEGER,
-      tokens INTEGER,
-      cache_hit INTEGER,
-      errors TEXT,
-      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`
+      id ${isPg ? 'SERIAL' : 'INTEGER'} PRIMARY KEY ${isPg ? '' : 'AUTOINCREMENT'},
+      endpoint TEXT, latency INTEGER, tokens INTEGER, cache_hit INTEGER,
+      errors TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
   ];
-
-  // Adjust table queries for PG vs SQLite
-  for (let tableSql of tables) {
-    if (isPg) {
-      // In PG, AUTOINCREMENT is SERIAL. Adjust sqlite elements.
-      tableSql = tableSql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY');
-      // Set timestamp defaults for pg
-      tableSql = tableSql.replace('DEFAULT CURRENT_TIMESTAMP', 'DEFAULT CURRENT_TIMESTAMP');
-    }
-    try {
-      await runQuery(tableSql);
-    } catch (err) {
-      console.error('Error creating table:', err.message, 'SQL:', tableSql);
-    }
+  for (const sql of tables) {
+    try { await runQuery(sql); } catch (err) { console.error('Table creation error:', err.message); }
   }
 }
 
-// User memory helper
+// ─── Helpers: in-memory vs SQL ────────────────────────────────────────────────
+const useMemory = () => IS_VERCEL && !isPg;
+
+// ─── User Memory ──────────────────────────────────────────────────────────────
 export async function saveUserMemory(userId, memory) {
+  if (useMemory()) {
+    mem.users.set(userId, { id: userId, memory: JSON.stringify(memory) });
+    return;
+  }
   const memStr = JSON.stringify(memory);
   const existing = await runQuery('SELECT id FROM users WHERE id = $1', [userId]);
   if (existing.length > 0) {
@@ -184,154 +162,169 @@ export async function saveUserMemory(userId, memory) {
 }
 
 export async function getUserMemory(userId) {
-  const rows = await runQuery('SELECT memory FROM users WHERE id = $1', [userId]);
-  if (rows.length > 0) {
-    return JSON.parse(rows[0].memory);
+  if (useMemory()) {
+    const row = mem.users.get(userId);
+    return row ? JSON.parse(row.memory) : null;
   }
-  return null;
+  const rows = await runQuery('SELECT memory FROM users WHERE id = $1', [userId]);
+  return rows.length > 0 ? JSON.parse(rows[0].memory) : null;
 }
 
-// Portfolio helper
+// ─── Portfolio ────────────────────────────────────────────────────────────────
 export async function getPortfolio(userId) {
+  if (useMemory()) return mem.portfolio.filter(r => r.user_id === userId);
   return await runQuery('SELECT * FROM portfolio WHERE user_id = $1', [userId]);
 }
 
 export async function savePortfolioItem(userId, item) {
   const { ticker, shares, avg_price, sector, geo } = item;
-  // If exists, average the price and add shares
+  if (useMemory()) {
+    const idx = mem.portfolio.findIndex(r => r.user_id === userId && r.ticker === ticker);
+    if (idx >= 0) {
+      const prev = mem.portfolio[idx];
+      const newShares = prev.shares + shares;
+      const newPrice = ((prev.avg_price * prev.shares) + (avg_price * shares)) / newShares;
+      mem.portfolio[idx] = { ...prev, shares: newShares, avg_price: newPrice, sector, geo };
+    } else {
+      mem.portfolio.push({ id: mem._nextId++, user_id: userId, ticker, shares, avg_price, sector, geo });
+    }
+    return;
+  }
   const existing = await runQuery('SELECT id, shares, avg_price FROM portfolio WHERE user_id = $1 AND ticker = $2', [userId, ticker]);
   if (existing.length > 0) {
-    const prevShares = existing[0].shares;
-    const prevPrice = existing[0].avg_price;
-    const newShares = prevShares + shares;
-    const newPrice = ((prevPrice * prevShares) + (avg_price * shares)) / newShares;
-    await runQuery(
-      'UPDATE portfolio SET shares = $1, avg_price = $2, sector = $3, geo = $4 WHERE id = $5',
-      [newShares, newPrice, sector, geo, existing[0].id]
-    );
+    const { id: eid, shares: ps, avg_price: pp } = existing[0];
+    const ns = ps + shares;
+    const np = ((pp * ps) + (avg_price * shares)) / ns;
+    await runQuery('UPDATE portfolio SET shares=$1, avg_price=$2, sector=$3, geo=$4 WHERE id=$5', [ns, np, sector, geo, eid]);
   } else {
-    await runQuery(
-      'INSERT INTO portfolio (user_id, ticker, shares, avg_price, sector, geo) VALUES ($1, $2, $3, $4, $5, $6)',
-      [userId, ticker, shares, avg_price, sector, geo]
-    );
+    await runQuery('INSERT INTO portfolio (user_id,ticker,shares,avg_price,sector,geo) VALUES ($1,$2,$3,$4,$5,$6)', [userId, ticker, shares, avg_price, sector, geo]);
   }
 }
 
 export async function clearPortfolio(userId) {
+  if (useMemory()) { mem.portfolio = mem.portfolio.filter(r => r.user_id !== userId); return; }
   await runQuery('DELETE FROM portfolio WHERE user_id = $1', [userId]);
 }
 
-// Watchlist helper
+// ─── Watchlist ────────────────────────────────────────────────────────────────
 export async function getWatchlist(userId) {
+  if (useMemory()) return mem.watchlist.filter(r => r.user_id === userId).map(r => r.ticker);
   const rows = await runQuery('SELECT ticker FROM watchlist WHERE user_id = $1', [userId]);
   return rows.map(r => r.ticker);
 }
 
 export async function addToWatchlist(userId, ticker) {
-  try {
-    await runQuery('INSERT INTO watchlist (user_id, ticker) VALUES ($1, $2)', [userId, ticker]);
-  } catch (err) {
-    // Avoid double inserts
+  if (useMemory()) {
+    const exists = mem.watchlist.some(r => r.user_id === userId && r.ticker === ticker);
+    if (!exists) mem.watchlist.push({ id: mem._nextId++, user_id: userId, ticker });
+    return;
   }
+  try { await runQuery('INSERT INTO watchlist (user_id,ticker) VALUES ($1,$2)', [userId, ticker]); } catch {}
 }
 
 export async function removeFromWatchlist(userId, ticker) {
-  await runQuery('DELETE FROM watchlist WHERE user_id = $1 AND ticker = $2', [userId, ticker]);
+  if (useMemory()) { mem.watchlist = mem.watchlist.filter(r => !(r.user_id === userId && r.ticker === ticker)); return; }
+  await runQuery('DELETE FROM watchlist WHERE user_id=$1 AND ticker=$2', [userId, ticker]);
 }
 
-// Recommendations helper
+// ─── Recommendations ──────────────────────────────────────────────────────────
 export async function saveRecommendation(userId, rec) {
   const { id, ticker, score, confidence, decision, report } = rec;
-  await runQuery(
-    'INSERT INTO recommendations (id, user_id, ticker, score, confidence, decision, report) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-    [id, userId, ticker, score, confidence, decision, JSON.stringify(report)]
-  );
+  if (useMemory()) {
+    mem.recommendations.unshift({ id, user_id: userId, ticker, score, confidence, decision, report: JSON.stringify(report), created_at: new Date().toISOString() });
+    return;
+  }
+  await runQuery('INSERT INTO recommendations (id,user_id,ticker,score,confidence,decision,report) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, userId, ticker, score, confidence, decision, JSON.stringify(report)]);
 }
 
 export async function getRecommendations(userId) {
-  const rows = await runQuery('SELECT * FROM recommendations WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-  return rows.map(r => ({
-    ...r,
-    report: JSON.parse(r.report)
-  }));
+  if (useMemory()) {
+    return mem.recommendations.filter(r => r.user_id === userId).map(r => ({ ...r, report: JSON.parse(r.report) }));
+  }
+  const rows = await runQuery('SELECT * FROM recommendations WHERE user_id=$1 ORDER BY created_at DESC', [userId]);
+  return rows.map(r => ({ ...r, report: JSON.parse(r.report) }));
 }
 
-// Observability helper
+// ─── Observability ────────────────────────────────────────────────────────────
 export async function logObservability(log) {
   const { endpoint, latency, tokens, cache_hit, errors } = log;
-  await runQuery(
-    'INSERT INTO observability_logs (endpoint, latency, tokens, cache_hit, errors) VALUES ($1, $2, $3, $4, $5)',
-    [endpoint, latency, tokens, cache_hit, errors ? String(errors) : null]
-  );
+  if (useMemory()) {
+    mem.observability.unshift({ id: mem._nextId++, endpoint, latency, tokens, cache_hit, errors: errors ? String(errors) : null, timestamp: new Date().toISOString() });
+    if (mem.observability.length > 100) mem.observability.pop(); // cap at 100
+    return;
+  }
+  await runQuery('INSERT INTO observability_logs (endpoint,latency,tokens,cache_hit,errors) VALUES ($1,$2,$3,$4,$5)', [endpoint, latency, tokens, cache_hit, errors ? String(errors) : null]);
 }
 
 export async function getObservabilityLogs() {
+  if (useMemory()) return mem.observability.slice(0, 100);
   return await runQuery('SELECT * FROM observability_logs ORDER BY timestamp DESC LIMIT 100');
 }
 
-// Authentication Helpers
+// ─── Authentication ───────────────────────────────────────────────────────────
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
 }
 
 export async function dbRegisterUser(username, password) {
-  const existing = await runQuery('SELECT username FROM user_auth WHERE username = $1', [username]);
-  if (existing.length > 0) {
-    throw new Error('Username already exists.');
+  if (useMemory()) {
+    if (mem.user_auth.has(username)) throw new Error('Username already exists.');
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = hashPassword(password, salt);
+    const userId = `user-${Math.random().toString(36).substring(2, 9)}`;
+    mem.user_auth.set(username, { username, password_hash: hash, salt, user_id: userId, session_token: null });
+    return userId;
   }
-
+  const existing = await runQuery('SELECT username FROM user_auth WHERE username = $1', [username]);
+  if (existing.length > 0) throw new Error('Username already exists.');
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = hashPassword(password, salt);
   const userId = `user-${Math.random().toString(36).substring(2, 9)}`;
-
-  await runQuery(
-    'INSERT INTO user_auth (username, password_hash, salt, user_id) VALUES ($1, $2, $3, $4)',
-    [username, hash, salt, userId]
-  );
+  await runQuery('INSERT INTO user_auth (username,password_hash,salt,user_id) VALUES ($1,$2,$3,$4)', [username, hash, salt, userId]);
   return userId;
 }
 
 export async function dbAuthenticateUser(username, password) {
-  const rows = await runQuery(
-    'SELECT password_hash, salt, user_id FROM user_auth WHERE username = $1',
-    [username]
-  );
-  if (rows.length === 0) {
-    throw new Error('Invalid username or password.');
+  if (useMemory()) {
+    const row = mem.user_auth.get(username);
+    if (!row) throw new Error('Invalid username or password.');
+    if (hashPassword(password, row.salt) !== row.password_hash) throw new Error('Invalid username or password.');
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    row.session_token = sessionToken;
+    mem.sessions.set(sessionToken, username);
+    return { userId: row.user_id, sessionToken };
   }
-
+  const rows = await runQuery('SELECT password_hash,salt,user_id FROM user_auth WHERE username=$1', [username]);
+  if (rows.length === 0) throw new Error('Invalid username or password.');
   const { password_hash, salt, user_id } = rows[0];
-  const hash = hashPassword(password, salt);
-
-  if (hash !== password_hash) {
-    throw new Error('Invalid username or password.');
-  }
-
+  if (hashPassword(password, salt) !== password_hash) throw new Error('Invalid username or password.');
   const sessionToken = crypto.randomBytes(32).toString('hex');
-  await runQuery(
-    'UPDATE user_auth SET session_token = $1 WHERE username = $2',
-    [sessionToken, username]
-  );
+  await runQuery('UPDATE user_auth SET session_token=$1 WHERE username=$2', [sessionToken, username]);
   return { userId: user_id, sessionToken };
 }
 
 export async function dbValidateSession(sessionToken) {
   if (!sessionToken) return null;
-  const rows = await runQuery(
-    'SELECT user_id FROM user_auth WHERE session_token = $1',
-    [sessionToken]
-  );
-  if (rows.length > 0) {
-    return rows[0].user_id;
+  if (useMemory()) {
+    const username = mem.sessions.get(sessionToken);
+    if (!username) return null;
+    const row = mem.user_auth.get(username);
+    return row ? row.user_id : null;
   }
-  return null;
+  const rows = await runQuery('SELECT user_id FROM user_auth WHERE session_token=$1', [sessionToken]);
+  return rows.length > 0 ? rows[0].user_id : null;
 }
 
 export async function dbDestroySession(sessionToken) {
   if (!sessionToken) return;
-  await runQuery(
-    'UPDATE user_auth SET session_token = NULL WHERE session_token = $1',
-    [sessionToken]
-  );
+  if (useMemory()) {
+    const username = mem.sessions.get(sessionToken);
+    if (username) {
+      const row = mem.user_auth.get(username);
+      if (row) row.session_token = null;
+      mem.sessions.delete(sessionToken);
+    }
+    return;
+  }
+  await runQuery('UPDATE user_auth SET session_token=NULL WHERE session_token=$1', [sessionToken]);
 }
-

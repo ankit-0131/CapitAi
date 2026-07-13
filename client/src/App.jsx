@@ -34,7 +34,6 @@ import ScenarioSimulator from './components/ScenarioSimulator';
 import Backtester from './components/Backtester';
 import DebateMode from './components/DebateMode';
 import ObservabilityView from './components/ObservabilityView';
-import ChatbotWidget from './components/ChatbotWidget';
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || '';
 
@@ -969,15 +968,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      <ChatbotWidget 
-        ticker={ticker}
-        userId={userId}
-        preferences={preferences}
-        portfolio={portfolio}
-        watchlist={watchlist}
-        currency={currency}
-      />
     </div>
   );
 }
