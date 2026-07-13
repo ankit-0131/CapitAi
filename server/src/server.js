@@ -43,12 +43,11 @@ app.use(express.json());
 // On Vercel, skip HTTP server and socket.io (serverless environment)
 const IS_VERCEL = !!process.env.VERCEL;
 let httpServer = null;
-// Provide a no-op io so coordinator.js doesn't crash (io usage is already guarded with `if (io)`)
-const io = IS_VERCEL
-  ? { emit: () => {}, on: () => {} }
-  : new Server(createServer(app), { cors: { origin: '*', methods: ['GET', 'POST'] } });
+let io = { emit: () => {}, on: () => {} };
+
 if (!IS_VERCEL) {
   httpServer = createServer(app);
+  io = new Server(httpServer, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 }
 
 // Observability Middleware
@@ -660,13 +659,13 @@ Please ask me a financial query, specify a stock ticker (e.g. TSLA, AAPL), or as
 async function startServer() {
   await initDb();
   await initCache();
-  const server = createServer(app);
-  const liveIo = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
-  liveIo.on('connection', (socket) => {
+  
+  io.on('connection', (socket) => {
     console.log(`Socket client connected: ${socket.id}`);
     socket.on('disconnect', () => console.log(`Socket client disconnected: ${socket.id}`));
   });
-  server.listen(PORT, () => {
+
+  httpServer.listen(PORT, () => {
     console.log(`========================================`);
     console.log(` CapitAI Backend is running on port ${PORT}`);
     console.log(`========================================`);
