@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "CapitAI - AI-powered Investment Intelligence Platform",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",

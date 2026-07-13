@@ -36,7 +36,7 @@ import DebateMode from './components/DebateMode';
 import ObservabilityView from './components/ObservabilityView';
 import ChatbotWidget from './components/ChatbotWidget';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL || '';
 
 const STOCK_PRESETS = [
   { symbol: 'TSLA', name: 'Tesla, Inc.' },
@@ -187,8 +187,9 @@ export default function App() {
     fetch(`${BACKEND_URL}/api/recommendations/${userId}`).then(res => res.json()).then(data => data.recommendations && setPastRecommendations(data.recommendations)).catch(() => {});
   };
 
-  // Socket sync
+  // Socket sync — only connect locally (Vercel serverless can't maintain persistent connections)
   useEffect(() => {
+    if (!BACKEND_URL) return; // skip on production — server-side socket is disabled on Vercel
     const socket = io(BACKEND_URL);
     socket.on('analysis_step', (step) => {
       setStreamLog((prev) => [...prev, step]);

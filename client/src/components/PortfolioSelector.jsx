@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const COLORS = ['#10b981', '#06b6d4', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL || '';
 
 export default function PortfolioSelector({ portfolio, userId, currency, refreshPortfolio }) {
   const [ticker, setTicker] = useState('');
